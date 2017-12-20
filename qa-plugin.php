@@ -1,10 +1,10 @@
 <?php
 /*
-	Plugin Name: q2apro Users List Extras
+	Plugin Name: q2apro Users Page Extras
 	Plugin URI: 
-	Plugin Description: Add Acceptance rate to users page
-	Plugin Version: 0.1
-	Plugin Date: 2013-01-13
+	Plugin Description: Add Thumbs-up count and Answer count to table of page users
+	Plugin Version: 0.2
+	Plugin Date: 2017-12-12
 	Plugin Author: q2apro.com
 	Plugin Author URI: http://www.q2apro.com/
 	Plugin License: GPLv3
@@ -32,62 +32,23 @@ if ( !defined('QA_VERSION') )
 }
 
 // layer
-qa_register_plugin_layer('q2apro-userslist-extras-layer.php', 'q2apro Users-List Extras');	
+qa_register_plugin_layer('q2apro-users-page-extras-layer.php', 'q2apro Users Page Extras');	
 
 
-// custom functions
-/*function qa_get_acceptance_rate_Q($handle) {
+function qa_get_acceptance_rate_A($userid) 
+{
 	
-	$userids = qa_handles_to_userids(array($handle));
-	$userid = $userids[$handle];
-
-	list( $userid, $count, $sel_count ) = questions_stats( $handle );
+	list( $userid, $count, $sel_count ) = answer_stats( $userid );
 	
 	// no such user exists
-	if ( $userid === null || $userid < 1 ) {
+	if ( $userid === null || $userid < 1 ) 
+	{
 		return;
 	}
 
 	$acceptRate = 0;
-	if($count>0) {
-		//$acceptRate = number_format(100*$sel_count/$count, 1, ',', '.');
-		$acceptRate = round(100*$sel_count/$count);
-	}
-	$output = '<span class="qa-userlist-acceptrate" title="Dieses Mitglied hat für '.$acceptRate.' % seiner Fragen die Beste Antwort ausgewählt">';
-	$output .= $acceptRate.' %</span>';
-	
-	return($output);
-
-}
-
-// userid, question count and selected count
-function questions_stats($handle) {
-	$sql_count =
-		'SELECT u.userid, count(p.postid) AS qs, count(p.selchildid) AS selected
-		 FROM ^users u
-		   LEFT JOIN ^posts p ON u.userid=p.userid AND p.type="Q"
-		 WHERE u.handle=$';
-	$result = qa_db_query_sub($sql_count, $handle);
-	$row = qa_db_read_one_assoc($result);
-
-	return array( $row['userid'], $row['qs'], $row['selected'] );
-}
-*/
-
-function qa_get_acceptance_rate_A($handle) {
-	
-	$userids = qa_handles_to_userids(array($handle));
-	$userid = $userids[$handle];
-
-	list( $userid, $count, $sel_count ) = answer_stats( $handle );
-	
-	// no such user exists
-	if ( $userid === null || $userid < 1 ) {
-		return;
-	}
-
-	$acceptRate = 0;
-	if($count>0) {
+	if($count>0) 
+	{
 		$acceptRate = number_format(100*$sel_count/$count, 1, ',', '.');
 		//$output .= round(100*$sel_count/$count).' %';
 	}
@@ -98,21 +59,27 @@ function qa_get_acceptance_rate_A($handle) {
 }
 
 
-// userid, answer count and selected count
-function answer_stats($handle) {
-	$sql_count =
-		'SELECT u.userid, COUNT(a.postid) AS qs, SUM(q.selchildid=a.postid) AS selected
-		 FROM ^users u
-		   LEFT JOIN ^posts a ON u.userid=a.userid AND a.type="A"
-		   LEFT JOIN ^posts q ON a.parentid=q.postid AND q.type="Q"
-		 WHERE u.handle=$';
-	$result = qa_db_query_sub($sql_count, $handle);
-	$row = qa_db_read_one_assoc($result);
+// userid, answer count and selected count - takes a lot of time to process! 
+function answer_stats($userid) 
+{
+	$userdata = qa_db_read_one_assoc( 
+				qa_db_query_sub('
+					SELECT u.userid, COUNT(a.postid) AS qs, SUM(q.selchildid=a.postid) AS selected
+					FROM ^users u
+					LEFT JOIN ^posts a ON u.userid = a.userid AND a.type="A"
+					LEFT JOIN ^posts q ON a.parentid = q.postid AND q.type="Q"
+					WHERE u.userid = $
+					', 
+					$userid) 
+			)
+	;
 
-	if ( $row['selected'] == null )
-		$row['selected'] = 0;
+	if(empty($userdata['selected']))
+	{
+		$userdata['selected'] = 0;
+	}
 
-	return array( $row['userid'], $row['qs'], $row['selected'] );
+	return array( $userdata['userid'], $userdata['qs'], $userdata['selected'] );
 }
 
 
